@@ -1,0 +1,193 @@
+---
+title: Scaling an App Using App Autoscaler
+owner: App Autoscaler
+---
+
+This topic describes how users with the Space Developer role can set up and configure the App Autoscaler service in the Apps Manager UI to automatically scale apps based on rules that they set. 
+
+You can use the App Autoscaler command-line interface (CLI) plugin to configure App Autoscaler rules from the command line. For more information, see [Using the App Autoscaler CLI](using-autoscaler-cli.html).
+
+<p class='note'><strong>Note:</strong> Space Managers, Space Auditors, and all Org roles do not have permission to use App Autoscaler. For help managing user roles, see <a href="../../console/console-roles.html">Managing User Accounts and Permissions Using Apps Manager</a>.</p>
+
+
+## <a id="overview"></a> Overview 
+
+To use App Autoscaler to automatically scale your apps, you must create and bind the App Autoscaler service, then configure scaling rules for App Autoscaler. 
+
+For more information about App Autoscaler, including information about how to create scaling rules, see [About App Autoscaler](about-app-autoscaler.html).
+
+
+## <a id="prerequisite"></a> Prerequisite
+
+Before using the Autoscaler service in Apps Manager, you must configure the `search-server` app for any deployments that have restrictive networking policies around request proxying.
+
+Autoscaler controls may not appear for apps in Apps Manager if your <%= vars.app_runtime_abbr %> deployment has restrictive networking policies around request proxying.
+
+To resolve this issue and enable Autoscaler controls in Apps Manager:
+
+1. Using the cf CLI, log in to the system org and system space.
+2. Locate the `search-server` app.
+3. Update the `no_proxy` environment variable for the `search-server` app to include your system domain.
+
+    ```
+    cf set-env search-server no_proxy '*.SYSTEM-DOMAIN'
+    ```
+    where `SYSTEM-DOMAIN` is the system domain configured for your <%= vars.app_runtime_abbr %> deployment.
+    For example:
+    <pre class="terminal">
+    cf set-env search-server no_proxy '*.example.com'
+    </pre>
+
+4. Restage the `search-server` app.
+
+    ```
+    cf restage search-server
+    ```
+
+## <a id="setup"></a> Configure App Autoscaler
+
+To configure App Autoscaler:
+
+1. Create and bind the App Autoscaler service to your app. See [Create and Bind the App Autoscaler Service](#create-bind-service).
+
+1. Configure autoscaling instance limits for your app. See [Configure Autoscaling for an App](#config).
+
+### <a id="create-bind-service"></a> Create and Bind the App Autoscaler Service
+
+To use App Autoscaler, you must create an instance of the App Autoscaler service and bind it to any app you want to autoscale. You can do this using either the Apps Manager or from the Cloud Foundry Command Line Interface (cf CLI):
+
+* **Apps Manager**: 
+    1. [Create an instance of the service](../adding-services-marketplace.html).
+    2. [Bind the service to an app](../adding-services-marketplace.html#bind-instance).
+
+* **cf CLI**:
+	1. [Create an instance of the service](../../devguide/services/managing-services.html#marketplace).
+	1. [Bind the service to an app](../../devguide/services/managing-services.html#bind).
+
+<p class="note"><strong>Note:</strong> Manual scaling overrides scaling rules that you configure with App Autoscaler. If you manually scale an app bound to an App Autoscaler service instance, the App Autoscaler instance automatically unbinds from that app, and the app scales to the manual setting. For more information, see <a href="../../console/manage-apps.html">Managing Apps and Service Instances Using Apps Manager</a>.</p>
+
+To enable App Autoscaler for an app:
+
+1. In Apps Manager, select an app from the space in which you created the App Autoscaler service.
+
+1. Under **Processes and Instances**, enable **Autoscaling**. 
+<%= image_tag("scale-app.png", :alt => "At the top of the image is the header 'Processes and Instances'. Below it is the subheader 'web', below which is a row of metrics: 'Instances: 2', 'Memory Allocated: 1 GB', and 'Disk Allocated: 512 MB'. To the right of these metrics is a grayed-out blue, rectangular button labeled 'Scale'. Below these metrics are a sliding button labeled 'Autoscaling' to the far left and the words 'Manage Autoscaling' in blue letters to the far right. Below these are a table with five columns labeled, from left to right, '#', 'CPU', 'Memory', 'Disk', and 'Uptime'. Below these are two rows. Under '#' are the number '0' in the first row and '1' in the second. Under 'CPU' is the text '0%' in both the first and second rows. Under 'Memory' is the text '6.63 MB' in the first row and '27.98 MB' in the second. Under 'Disk' is the text '51.07' in both the first and second rows. Under 'Uptime' is the text '4 d 21 hr 58 min' in the first row and '4 d 21 hr 56 min' in the second row.") %>
+
+1. Click **Manage Autoscaling** to configure instance limits, scaling rules, and scheduled limit changes for the app. For more information, see [Configure Autoscaling for an App](#config).
+
+      <%= image_tag('images/manage-autoscaling.png') %>
+
+### <a id="config"></a> Configure Autoscaling for an App
+
+App Autoscaler keeps instance counts within an allowable range defined by minimum and maximum values. The minimum and maximum values are called instance limits. 
+
+For more information about how App Autoscaler makes scaling decisions for an app, see [How App Autoscaler Determines When to Scale](about-app-autoscaler.html#about-scaling-decisions) in _About App Autoscaler_.
+
+Follow the procedures in the sections below:
+
+* [Create or Modify Instance Limits](#limits)
+* [Add or Delete Scaling Rules](#metric)
+* [Create or Modify Scheduled Limit Changes](#schedule)
+
+#### <a id="limits"></a> Create or Modify Instance Limits
+
+This section describes how to create and edit instance limits for app scaling rules. You can also schedule changes to your instance limits for a specific date and time. For more information, see [Scheduled Limit Changes](#schedule).
+
+To manually modify instance limits:
+
+1. In Apps Manager, navigate to the **Overview** page for your app. Under **Processes and Instances**, click **Manage Autoscaling**.
+
+1. In the **Instance Limits** section, set values for **Minimum** and **Maximum**.
+
+    <%= image_tag('images/instance-limits.png') %>
+
+1. Click **Apply Changes**.
+
+#### <a id="metric"></a> Add or Delete Scaling Rules
+
+The following procedures describe how to add and delete scaling rules for your apps with App Autoscaler. 
+
+For more information about scaling rules and metrics in App Autoscaler, see [About App Autoscaler Scaling Rules](#about-scaling).
+
+To add a scaling rule for an app:
+
+1. In the **Manage Autoscaling** pane, click **Edit** next to **Scaling Rules**. The **Edit Scaling Rules** pane appears.
+
+1. Click **Add Rule**.
+
+1. In the **Select type** dropdown, select the metric for the new scaling rule.
+
+    <%= image_tag('images/scaling-rules.png') %>
+
+1. Set the minimum and maximum thresholds for the metric. For information about setting instance limits, see [About App Autoscaler Scaling Rules](about-app-autoscaler.html#about-scaling) in _About App Autoscaler_.
+
+1. Select or fill in any other fields that appear under the threshold fields:
+    * If you are adding an **HTTP Latency** rule, configure **Percent of traffic to apply**.
+    * If you are adding a **RabbitMQ** depth rule, provide the name of the queue to measure.
+    * If you are adding a **Custom** rule, enter your custom **Metric**.
+    * If you are adding a **Compare** rule, enter values in the **Metric** and **Comparison Metric** fields. 
+
+1. Click **Save**.
+
+To delete a scaling rule for an app:
+
+1. Click the **x** icon next to the rule you want to delete.
+
+1. Click **Save**.
+
+#### <a id="schedule"></a> Create or Modify Scheduled Limit Changes
+
+Because app demand often follows a weekly, daily, or hourly schedule, you can schedule App Autoscaler to change the allowable instance range to track expected surges or quiet periods. 
+
+To create or modify a scheduled limit change:
+
+1. Click **Edit** next to **Scheduled Limits**.
+
+1. Click **Add New** to add a new scheduled limit or select an existing entry to modify by clicking **EDIT** next to the entry.
+
+1. Edit the following values:
+	* **Date** and **Time (local)**: Set the date and time of the change.
+	* **Repeat (Optional)**: Set the day of the week for which you want to repeat the change.
+	* **Min** and **Max**: Set the allowable range within which App Autoscaler can change the instance count for an app.
+
+	    <%= image_tag('images/scheduled-changes.png') %>
+
+1. Click **Save**.
+
+To delete an existing entry, click the **x** icon next to the entry you want to delete.
+
+For example, to schedule an app to scale down for a weekend, you can enter two rules as follows:
+
+1. Scale down to a single instance on Friday evening:
+	* **Date** and **Time (local)**: `Dec`, `2`, `2018` and `7:00 PM`
+	* **Repeat (Optional)**: `Fr`
+	* **Min** and **Max**: `1` and `1`
+
+1. Increase instances to between 3 and 5 on Monday morning:
+	* **Date** and **Time (local)**: `Dec`, `5`, `2018` and `7:00 AM`
+	* **Repeat (Optional)**: `M`
+	* **Min** and **Max**: `3` and `5`
+
+
+## <a id="notifs"></a> View and Manage App Autoscaler Events and Notifications
+
+App Autoscaler logs all autoscaling events. You can view event history and manage notifications for App Autoscaler. 
+
+### <a id='view-event-history'></a> View Event History
+
+To view all autoscaling events in the past 24 hours, click **View More** in the **Event History** section of the **Manage Autoscaling** pane.
+
+<%= image_tag('images/event-history.png') %>
+
+### <a id='manage-notifications'></a> Manage App Autoscaler Notifications
+
+App Autoscaler emails or texts its event notifications to all users with the Space Developer role by default.
+
+To subscribe or unsubscribe from autoscaling event notifications:
+
+1. Navigate to the **Manage Notifications** page in <%= vars.platform_name %>.
+	<p class="note"><strong>Note:</strong> If installed, Notifications Management should be available at <code>http<span>s</span>://notifications-ui.SYSTEM-DOMAIN/preferences</code>, where <code>SYSTEM-DOMAIN</code> is your system domain.</p>   
+
+1. Choose which notifications you want to receive from App Autoscaler:
+
+	![Notifications](manage-notifications.png)
